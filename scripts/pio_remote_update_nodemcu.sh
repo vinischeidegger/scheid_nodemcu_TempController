@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/pio_remote_common.sh"
 
 UPLOAD_FS="true"
+UPLOAD_SPEEDS="${PIO_UPLOAD_SPEEDS:-57600 38400 19200}"
 
 print_help() {
     cat <<'EOF'
@@ -28,7 +29,49 @@ Optional environment variables:
   PIO_PROJECT_PATH   Project path from repo root (default: .)
   PIO_ENV            PlatformIO environment (default: nodemcuv2)
   NODEMCU_PORT       Serial upload port (default: /dev/nodemcu)
+    PIO_UPLOAD_SPEEDS  Space-separated retry speeds (default: "57600 38400 19200")
 EOF
+}
+
+upload_target_with_retries() {
+        local target="$1"
+        local label="$2"
+        local -a speeds
+
+        read -r -a speeds <<< "${UPLOAD_SPEEDS}"
+        if [[ ${#speeds[@]} -eq 0 ]]; then
+                echo "No upload speeds configured."
+                return 1
+        fi
+
+        local attempt=1
+        local total=${#speeds[@]}
+
+        for speed in "${speeds[@]}"; do
+            local host_tmp_conf="${REPO_ROOT}/.pio_upload_${target}_${speed}.ini"
+            local container_tmp_conf="${CONTAINER_PROJECT_DIR}/.pio_upload_${target}_${speed}.ini"
+
+            cp "${REPO_ROOT}/platformio.ini" "${host_tmp_conf}"
+            if grep -qE '^upload_speed\s*=' "${host_tmp_conf}"; then
+                sed -i -E "s/^upload_speed\s*=.*/upload_speed = ${speed}/" "${host_tmp_conf}"
+            else
+                printf '\nupload_speed = %s\n' "${speed}" >> "${host_tmp_conf}"
+            fi
+
+                echo "${label} attempt ${attempt}/${total} at ${speed} baud..."
+            if compose_run run -d "${CONTAINER_PROJECT_DIR}" --project-conf "${container_tmp_conf}" -e "${PIO_ENV}" -t "${target}" --upload-port "${NODEMCU_PORT}"; then
+                rm -f "${host_tmp_conf}"
+                        echo "${label} succeeded at ${speed} baud."
+                        return 0
+                fi
+
+            rm -f "${host_tmp_conf}"
+                echo "${label} failed at ${speed} baud."
+                attempt=$((attempt + 1))
+        done
+
+        echo "${label} failed after ${total} attempts."
+        return 1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -55,17 +98,18 @@ done
 
 print_runtime_config
 echo "  upload port  : ${NODEMCU_PORT}"
+echo "  speeds       : ${UPLOAD_SPEEDS}"
 
 echo
 echo "Uploading firmware to NodeMCU..."
-compose_run run -d "${CONTAINER_PROJECT_DIR}" -e "${PIO_ENV}" -t upload --upload-port "${NODEMCU_PORT}"
+upload_target_with_retries "upload" "Firmware upload"
 
 echo "Firmware upload finished successfully."
 
 if [[ "${UPLOAD_FS}" == "true" ]]; then
     echo
     echo "Uploading filesystem image to NodeMCU..."
-    compose_run run -d "${CONTAINER_PROJECT_DIR}" -e "${PIO_ENV}" -t uploadfs --upload-port "${NODEMCU_PORT}"
+    upload_target_with_retries "uploadfs" "Filesystem upload"
     echo "Filesystem upload finished successfully."
 else
     echo

@@ -59,7 +59,27 @@ void TemperatureControllerApp::Loop() {
 }
 
 void TemperatureControllerApp::AppendSensorStatusItems(JsonArray items) {
-    sensorDiscovery_.RequestTemperatures();
+    const bool hasDiscoveredSensors = sensorDiscovery_.Count() > 0;
+    bool hasReadableConfiguredSensor = false;
+
+    if (hasDiscoveredSensors) {
+        for (size_t i = 0; i < kMaxSensors; ++i) {
+            if (!sensorSlots_[i].enabled) {
+                continue;
+            }
+
+            DeviceAddress configuredAddress;
+            const AddressParseStatus parseStatus = AddressCodec::Parse(sensorSlots_[i].address, configuredAddress);
+            if (AddressCodec::IsOk(parseStatus)) {
+                hasReadableConfiguredSensor = true;
+                break;
+            }
+        }
+    }
+
+    if (hasReadableConfiguredSensor) {
+        sensorDiscovery_.RequestTemperatures();
+    }
 
     for (size_t i = 0; i < kMaxSensors; ++i) {
         JsonArray row = items.add<JsonArray>();
@@ -79,6 +99,11 @@ void TemperatureControllerApp::AppendSensorStatusItems(JsonArray items) {
         const AddressParseStatus parseStatus = AddressCodec::Parse(sensorSlots_[i].address, configuredAddress);
         if (!AddressCodec::IsOk(parseStatus)) {
             row.add("Not configured");
+            continue;
+        }
+
+        if (!hasDiscoveredSensors) {
+            row.add("No sensor detected");
             continue;
         }
 

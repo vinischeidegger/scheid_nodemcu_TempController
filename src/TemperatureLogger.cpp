@@ -18,6 +18,10 @@ void TemperatureLogger::ReadAndLog(Stream& out) {
         DeviceAddress configuredAddress;
         const AddressParseStatus parseStatus = AddressCodec::Parse(sensorSlots_[i].address, configuredAddress);
         if (!AddressCodec::IsOk(parseStatus)) {
+            if (sensorSlots_[i].address.isEmpty()) {
+                continue;
+            }
+
             out.print("Slot ");
             out.print(i + 1);
             if (parseStatus == AddressParseStatus::kInvalidCharacter) {
