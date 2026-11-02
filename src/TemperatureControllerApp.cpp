@@ -1,5 +1,7 @@
 #include "TemperatureControllerApp.h"
 
+#include "AddressCodec.h"
+
 namespace tempcontroller {
 
 TemperatureControllerApp::TemperatureControllerApp()
@@ -25,6 +27,9 @@ void TemperatureControllerApp::Setup() {
 
     configManager_.setMdnsHostname(dhcpHostname);
     configManager_.setPageTitle("Temperature Controller Configuration");
+    configManager_.setStatusItemsCallback([this](JsonArray items) {
+        AppendSensorStatusItems(items);
+    });
     configManager_.begin();
 
     sensorDiscovery_.Begin();
@@ -51,6 +56,40 @@ void TemperatureControllerApp::Loop() {
 
     lastReadAt_ = now;
     temperatureLogger_.ReadAndLog(Serial);
+}
+
+void TemperatureControllerApp::AppendSensorStatusItems(JsonArray items) {
+    sensorDiscovery_.RequestTemperatures();
+
+    for (size_t i = 0; i < kMaxSensors; ++i) {
+        JsonArray row = items.add<JsonArray>();
+
+        String label = sensorSlots_[i].name;
+        if (label.isEmpty()) {
+            label = "Sensor " + String(i + 1);
+        }
+        row.add(label + " Temperature");
+
+        if (!sensorSlots_[i].enabled) {
+            row.add("Disabled");
+            continue;
+        }
+
+        DeviceAddress configuredAddress;
+        const AddressParseStatus parseStatus = AddressCodec::Parse(sensorSlots_[i].address, configuredAddress);
+        if (!AddressCodec::IsOk(parseStatus)) {
+            row.add("Not configured");
+            continue;
+        }
+
+        const float temperatureC = sensorDiscovery_.ReadC(configuredAddress);
+        if (temperatureC == DEVICE_DISCONNECTED_C) {
+            row.add("Disconnected");
+            continue;
+        }
+
+        row.add(String(temperatureC, 2) + " C");
+    }
 }
 
 } // namespace tempcontroller

@@ -35,6 +35,8 @@ private:
     TemperatureLogger temperatureLogger_;
 
     unsigned long lastReadAt_;
+
+    void AppendSensorStatusItems(JsonArray items);
 };
 
 } // namespace tempcontroller
