@@ -1,0 +1,19 @@
+{
+  "name": "TempController",
+  "version": "1.0.0",
+  "description": "NodeMCU DS18B20 temperature controller built on top of ConfigManager",
+  "keywords": ["temperature", "ds18b20", "esp8266", "nodemcu", "onewire"],
+  "authors": [
+    {
+      "name": "Vinicius Scheidegger",
+      "url": "https://github.com/vinischeidegger/scheid_nodemcu_TempController"
+    }
+  ],
+  "license": "MIT",
+  "frameworks": "arduino",
+  "platforms": ["espressif8266", "espressif32"],
+  "dependencies": {
+    "milesburton/DallasTemperature": "^3.11.0",
+    "paulstoffregen/OneWire": "^2.3.8"
+  }
+}
