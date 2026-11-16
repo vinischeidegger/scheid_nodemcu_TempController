@@ -5,6 +5,7 @@
 #include <DallasTemperature.h>
 #include <ESP8266WiFi.h>
 #include <OneWire.h>
+#include <PubSubClient.h>
 
 #include "SensorAutoMapper.h"
 #include "SensorConfigRegistry.h"
@@ -34,9 +35,30 @@ private:
     SensorAutoMapper autoMapper_;
     TemperatureLogger temperatureLogger_;
 
+    bool mqttEnabled_;
+    String mqttServer_;
+    uint32_t mqttPort_;
+    String mqttUsername_;
+    String mqttPassword_;
+    String mqttBaseTopic_;
+    unsigned long mqttPublishIntervalMs_;
+
+    WiFiClient mqttNetworkClient_;
+    PubSubClient mqttClient_;
+
     unsigned long lastReadAt_;
+    unsigned long lastMqttPublishAt_;
+    unsigned long lastMqttConnectAttemptAt_;
+
+    float cachedTemperatureC_[kMaxSensors];
+    bool hasTemperatureSnapshot_;
 
     void AppendSensorStatusItems(JsonArray items);
+    bool IsWifiReadyForMqtt() const;
+    void MaintainMqttConnection(unsigned long now);
+    void PublishSensorReadingsToMqtt(unsigned long now);
+    String BuildSensorTemperatureTopic(size_t slotIndex) const;
+    void UpdateTemperatureSnapshotFromLastConversion();
 };
 
 } // namespace tempcontroller

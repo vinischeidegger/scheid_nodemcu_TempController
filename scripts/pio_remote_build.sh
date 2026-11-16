@@ -30,6 +30,15 @@ print_runtime_config
 
 echo
 echo "Building firmware in Docker..."
-compose_run run -d "${CONTAINER_PROJECT_DIR}" -e "${PIO_ENV}"
+
+COMPOSE_FILE_NO_DEVICES="$(mktemp)"
+sed '/^[[:space:]]*devices:[[:space:]]*$/,/^[[:space:]]*volumes:[[:space:]]*$/ { /^[[:space:]]*volumes:[[:space:]]*$/!d }' "${PIO_COMPOSE_FILE}" > "${COMPOSE_FILE_NO_DEVICES}"
+
+cleanup() {
+  rm -f "${COMPOSE_FILE_NO_DEVICES}"
+}
+trap cleanup EXIT
+
+docker compose -f "${COMPOSE_FILE_NO_DEVICES}" run --rm --no-deps "${PIO_SERVICE}" run -d "${CONTAINER_PROJECT_DIR}" -e "${PIO_ENV}"
 
 echo "Build finished successfully."
