@@ -49,6 +49,8 @@ private:
     unsigned long lastReadAt_;
     unsigned long lastMqttPublishAt_;
     unsigned long lastMqttConnectAttemptAt_;
+    bool mqttConnectedSnapshot_;
+    bool wifiReadyForMqttSnapshot_;
 
     float cachedTemperatureC_[kMaxSensors];
     bool hasTemperatureSnapshot_;

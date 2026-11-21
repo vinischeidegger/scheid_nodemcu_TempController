@@ -23,6 +23,8 @@ TemperatureControllerApp::TemperatureControllerApp()
       lastReadAt_(0),
       lastMqttPublishAt_(0),
       lastMqttConnectAttemptAt_(0),
+      mqttConnectedSnapshot_(false),
+      wifiReadyForMqttSnapshot_(false),
       hasTemperatureSnapshot_(false) {
     for (size_t i = 0; i < kMaxSensors; ++i) {
         cachedTemperatureC_[i] = DEVICE_DISCONNECTED_C;
@@ -65,8 +67,15 @@ void TemperatureControllerApp::Loop() {
     configManager_.handle();
     const unsigned long now = millis();
 
+    const bool wifiReady = IsWifiReadyForMqtt();
+    wifiReadyForMqttSnapshot_ = wifiReady;
+
     MaintainMqttConnection(now);
-    if (mqttClient_.connected()) {
+
+    const bool mqttConnected = mqttClient_.connected();
+    mqttConnectedSnapshot_ = mqttConnected;
+
+    if (mqttConnected) {
         mqttClient_.loop();
         PublishSensorReadingsToMqtt(now);
     }
@@ -221,9 +230,9 @@ void TemperatureControllerApp::AppendSensorStatusItems(JsonArray items) {
         mqttRow.add("Disabled");
     } else if (mqttServer_.isEmpty()) {
         mqttRow.add("Enabled (server not configured)");
-    } else if (!IsWifiReadyForMqtt()) {
+    } else if (!wifiReadyForMqttSnapshot_) {
         mqttRow.add("Waiting for WiFi STA");
-    } else if (mqttClient_.connected()) {
+    } else if (mqttConnectedSnapshot_) {
         mqttRow.add("Connected");
     } else {
         mqttRow.add("Disconnected");
